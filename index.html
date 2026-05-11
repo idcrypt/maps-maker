@@ -3,102 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arsip Peta Dinas - Maps Maker</title>
+  <title>Arsip Peta Dinas</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root { --primary: #2563eb; --success: #10b981; --danger: #ef4444; --dark: #0f172a; --glass: rgba(15, 23, 42, 0.85); --text: #e2e8f0; }
+    :root { --primary: #2563eb; --success: #10b981; --dark: #0f172a; --glass: rgba(15, 23, 42, 0.85); --text: #e2e8f0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; overflow: hidden; background: #1e293b; color: var(--text); }
+    
+    body { 
+      font-family: 'Segoe UI', system-ui, sans-serif; 
+      background: #1e293b; color: var(--text); 
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      overflow-y: auto; /* Agar foto panjang bisa di-scroll */
+    }
 
     /* Upload Screen */
-    #upload-screen { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: linear-gradient(135deg, #1e293b, #0f172a); z-index: 100; transition: opacity 0.4s; }
+    #upload-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0f172a; z-index: 100; transition: 0.4s; }
     #upload-screen.hidden { opacity: 0; pointer-events: none; }
-    .upload-box { background: white; padding: 2rem; border-radius: 12px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); max-width: 400px; width: 90%; }
-    .upload-box h2 { margin-bottom: 0.5rem; color: #1e293b; }
-    .upload-box p { color: #64748b; margin-bottom: 1.2rem; font-size: 0.9rem; }
+    .upload-box { background: white; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; color: #1e293b; }
     input[type="file"] { display: none; }
-    .btn-upload { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
-    .btn-upload:hover { background: #1d4ed8; }
+    .btn-upload { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
 
-    /* Archive Container */
-    #archive-container { position: relative; width: 100%; height: 100vh; display: none; }
+    /* Archive Container: Ukurannya akan di-set via JS */
+    #archive-container { 
+      position: relative; 
+      background: #000; 
+      display: none; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      margin: 20px 0; /* Memberi jarak atas-bawah */
+    }
     #archive-container.active { display: block; }
-    #bg-photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 
-    /* Bottom Overlay Panel (1/8 layar) */
+    #bg-photo { display: block; width: 100%; height: 100%; object-fit: fill; }
+
+    /* Bottom Panel */
     #bottom-panel {
       position: absolute; bottom: 0; left: 0; right: 0;
-      height: 12.5vh; min-height: 90px; max-height: 110px;
       background: var(--glass); backdrop-filter: blur(8px);
-      display: flex; gap: 12px; padding: 10px; z-index: 10;
-      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex; gap: 10px; padding: 8px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      overflow: hidden; /* Tinggi diatur via JS */
     }
-    #mini-map { flex: 2; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); }
-    #data-section { flex: 3; display: flex; flex-direction: column; color: white; }
-    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .panel-header h3 { font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-    .panel-header span { font-size: 0.75rem; background: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 4px; }
+    #mini-map { flex: 2; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); background: #334155; }
     
-    #loc-list { list-style: none; overflow-y: auto; flex: 1; margin-right: 8px; }
-    .loc-item { padding: 4px 6px; font-size: 0.82rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
-    .loc-item:last-child { border-bottom: none; }
-    .loc-time { font-weight: 600; color: #93c5fd; }
-    .loc-coords { font-family: monospace; font-size: 0.75rem; color: #cbd5e1; }
-    .loc-note { font-size: 0.78rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-    .loc-actions button { background: transparent; border: none; color: #60a5fa; cursor: pointer; font-size: 0.75rem; padding: 0 4px; }
+    #data-section { flex: 3; display: flex; flex-direction: column; color: white; overflow: hidden; }
+    .panel-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .panel-header h3 { font-size: 14px; font-weight: 600; }
+    .panel-header span { font-size: 11px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; }
+    
+    #loc-list { list-style: none; overflow-y: auto; flex: 1; margin-right: 6px; font-size: 12px; }
+    .loc-item { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .loc-time { color: #93c5fd; font-weight: 600; }
+    .loc-coords { font-family: monospace; color: #cbd5e1; font-size: 11px; }
+    .loc-note { color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
+    
+    .loc-actions button { background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 12px; padding: 0 4px; }
     .loc-actions button:hover { color: white; }
 
-    .controls { display: flex; gap: 6px; margin-top: 4px; }
-    .controls button { padding: 5px 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; cursor: pointer; font-size: 0.78rem; transition: 0.2s; }
-    .controls button:hover { background: rgba(255,255,255,0.25); }
-    .controls button.btn-active { background: var(--success); border-color: var(--success); }
-    .controls button.btn-download { background: var(--primary); }
+    .controls { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
+    .controls button { padding: 4px 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .controls button:hover { background: rgba(255,255,255,0.3); }
+    .btn-active { background: var(--success) !important; }
 
-    /* Popup Form */
-    .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-    .leaflet-popup-content { margin: 8px 12px; }
-    .popup-form label { display: block; margin: 5px 0 2px; font-size: 0.82rem; color: #cbd5e1; }
-    .popup-form input { width: 100%; padding: 5px; border: 1px solid #475569; border-radius: 4px; background: #0f172a; color: white; font-size: 0.85rem; }
-    .popup-form .btn-group { display: flex; gap: 8px; margin-top: 8px; }
-    .popup-form .btn-group button { flex: 1; padding: 6px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
+    /* Popup */
+    .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 6px; }
+    .popup-form label { display: block; margin: 4px 0 2px; font-size: 12px; }
+    .popup-form input { width: 100%; padding: 4px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 3px; }
+    .popup-form .btn-group { display: flex; gap: 4px; margin-top: 6px; }
+    .popup-form button { flex: 1; padding: 4px; border: none; border-radius: 3px; cursor: pointer; }
     .btn-save { background: var(--success); color: white; }
     .btn-cancel { background: #475569; color: white; }
-
-    @media (max-width: 600px) {
-      #bottom-panel { flex-direction: column; height: auto; max-height: 35vh; }
-      #mini-map { height: 40%; flex: none; }
-      #data-section { flex: 1; }
-    }
   </style>
 </head>
 <body>
-
-  <!-- Upload Screen -->
   <div id="upload-screen">
     <div class="upload-box">
-      <h2>📷 Arsip Kegiatan Dinas</h2>
-      <p>Upload foto dokumentasi lokasi. Peta & data koordinat akan muncul di panel bawah.</p>
-      <label class="btn-upload">
-        Pilih Foto
-        <input type="file" id="photo-input" accept="image/*">
-      </label>
+      <h2>📷 Arsip Dinas</h2>
+      <p>Upload foto dokumentasi. Rasio asli foto akan dipertahankan.</p>
+      <label class="btn-upload">Pilih Foto<input type="file" id="photo-input" accept="image/*"></label>
     </div>
   </div>
 
-  <!-- Main Archive Container -->
   <div id="archive-container">
-    <img id="bg-photo" src="" alt="Foto Arsip">
+    <img id="bg-photo" src="" alt="Arsip">
     <div id="bottom-panel">
       <div id="mini-map"></div>
       <div id="data-section">
-        <div class="panel-header">
-          <h3>📍 Data Titik Lokasi</h3>
-          <span id="count-badge">0 titik</span>
-        </div>
+        <div class="panel-header"><h3>📍 Data Lokasi</h3><span id="count-badge">0</span></div>
         <ul id="loc-list"></ul>
         <div class="controls">
           <button id="toggle-add">📌 Tambah Titik</button>
-          <button id="btn-download">📥 Unduh Arsip</button>
+          <button id="btn-download">📥 Unduh</button>
           <button id="btn-reset">🔄 Reset</button>
         </div>
       </div>
@@ -106,7 +100,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
