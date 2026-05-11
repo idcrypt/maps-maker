@@ -3,130 +3,260 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arsip Peta Dinas</title>
+  <title>Arsip Peta Dinas - Maps Maker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root { --glass: rgba(15, 23, 42, 0.92); --text: #f8fafc; --accent: #3b82f6; --success: #10b981; --danger: #ef4444; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0f172a; color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    :root { --bg: #0f172a; --panel: rgba(15, 23, 42, 0.95); --accent: #3b82f6; --success: #10b981; --text: #f8fafc; --border: #334155; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 10px; overflow-y: auto; }
 
-    #upload-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0f172a; z-index: 100; transition: 0.3s; }
+    /* Upload Screen */
+    #upload-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg); z-index: 100; transition: 0.3s; }
     #upload-screen.hidden { opacity: 0; pointer-events: none; }
-    .upload-box { background: #1e293b; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; border: 1px solid #334155; }
-    .upload-box h2 { margin-bottom: 0.5rem; color: white; }
-    .upload-box p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.95rem; }
+    .upload-box { background: #1e293b; padding: 2rem; border-radius: 12px; text-align: center; border: 1px solid var(--border); max-width: 90%; width: 400px; }
+    .upload-box h2 { margin-bottom: 0.5rem; } .upload-box p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.95rem; }
     input[type="file"] { display: none; }
-    .btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 1rem; }
-    .btn:hover { background: #2563eb; }
+    .btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
 
-    /* Container Dinamis */
-    #archive-container { position: relative; background: #000; display: none; box-shadow: 0 12px 32px rgba(0,0,0,0.6); margin: 0 auto; overflow: hidden; border-radius: 4px; }
-    #archive-container.active { display: block; }
-    #bg-photo { display: block; width: 100%; height: 100%; object-fit: cover; }
+    /* Main Container */
+    #app-container { display: none; flex-direction: column; width: 100%; max-width: 1200px; gap: 10px; margin-bottom: 20px; }
+    #app-container.active { display: flex; }
 
-    /* Panel Data (Ditinggikan & Diperjelas) */
-    #info-panel {
-      position: absolute; bottom: 20px; left: 20px; right: 20px;
-      background: var(--glass); backdrop-filter: blur(12px);
-      border-radius: 10px; border: 1px solid rgba(255,255,255,0.15);
-      padding: 12px; display: flex; gap: 12px; align-items: stretch;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    /* Photo Area */
+    #photo-area { background: #000; border-radius: 8px; overflow: hidden; width: 100%; display: flex; justify-content: center; align-items: center; }
+    #bg-photo { display: block; max-height: 55vh; max-width: 100%; object-fit: contain; }
+
+    /* Bottom Functional Panel (DITINGGIKAN & FUNGSIONAL) */
+    #bottom-panel { 
+      background: var(--panel); backdrop-filter: blur(12px);
+      border-radius: 12px; border: 1px solid var(--border);
+      padding: 14px; display: flex; gap: 14px; flex-wrap: wrap;
+      min-height: 38vh; /* 38% tinggi layar */
     }
-    #mini-map { flex: 1; min-width: 30%; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); background: #334155; }
+    #map-section { flex: 1.2; min-width: 280px; height: 100%; min-height: 260px; border-radius: 8px; overflow: hidden; position: relative; background: #1e293b; }
+    #mini-map { width: 100%; height: 100%; }
+
+    #form-section { flex: 1.8; min-width: 300px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
     
-    #data-section { flex: 2; display: flex; flex-direction: column; overflow: hidden; }
-    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    .panel-header h3 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-    .panel-header span { background: rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-
-    #loc-list { list-style: none; overflow-y: auto; flex: 1; padding-right: 4px; font-size: 13px; }
-    .loc-item { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
-    .loc-main { display: flex; flex-direction: column; gap: 2px; }
-    .loc-time { font-weight: 600; color: #93c5fd; font-size: 13px; }
-    .loc-meta { display: flex; gap: 8px; align-items: center; }
-    .loc-coords { font-family: 'JetBrains Mono', monospace; color: #cbd5e1; font-size: 12px; }
-    .loc-note { color: #e2e8f0; font-size: 13px; }
-    .loc-actions button { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0 4px; font-size: 14px; transition: 0.2s; }
-    .loc-actions button:hover { color: white; transform: scale(1.1); }
-    .btn-delete { color: #f87171 !important; }
-
-    .controls { display: flex; gap: 6px; margin-top: 8px; }
-    .controls button { padding: 6px 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
-    .controls button:hover { background: rgba(255,255,255,0.2); }
-    .btn-active { background: var(--success) !important; border-color: var(--success) !important; color: white !important; }
-
-    /* Modal Input (Pengganti Popup Kecil) */
-    #input-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: none; justify-content: center; align-items: center; z-index: 200; }
-    #input-modal.active { display: flex; }
-    .modal-card { background: #1e293b; padding: 20px; border-radius: 12px; width: 90%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
-    .modal-card h3 { margin-bottom: 12px; font-size: 16px; color: white; display: flex; align-items: center; gap: 8px; }
-    .modal-coords { background: #0f172a; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #94a3b8; margin-bottom: 14px; border: 1px solid #334155; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; margin-bottom: 4px; font-size: 13px; color: #cbd5e1; font-weight: 500; }
-    .form-group input { width: 100%; padding: 10px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; color: white; font-size: 14px; outline: none; }
+    .form-row { display: flex; gap: 10px; }
+    .form-group { flex: 1; display: flex; flex-direction: column; }
+    .form-group label { font-size: 12px; color: #94a3b8; margin-bottom: 5px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+    .form-group input { 
+      padding: 10px; background: #0f172a; border: 1px solid var(--border); 
+      border-radius: 6px; color: white; font-size: 14px; outline: none; width: 100%;
+    }
     .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
-    .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
-    .modal-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
-    .btn-save { background: var(--success); color: white; }
-    .btn-save:hover { background: #059669; }
-    .btn-cancel { background: #475569; color: white; }
-    .btn-cancel:hover { background: #334155; }
 
-    @media (max-width: 600px) {
-      #info-panel { flex-direction: column; bottom: 10px; left: 10px; right: 10px; padding: 10px; }
-      #mini-map { height: 100px; min-width: 100%; }
-      #data-section { flex: 1; }
-      .modal-card { width: 95%; }
+    .btn-group { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-act { padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; color: white; font-size: 14px; transition: 0.2s; flex: 1; }
+    .btn-map { background: #64748b; } .btn-map.active { background: var(--success); }
+    .btn-add { background: var(--accent); }
+    .btn-dl { background: var(--success); } .btn-rst { background: #ef4444; }
+    .btn-act:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    #loc-list { list-style: none; overflow-y: auto; max-height: 150px; padding-right: 4px; margin-top: 4px; }
+    .loc-item { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .loc-info { display: flex; flex-direction: column; gap: 2px; }
+    .loc-time { color: #93c5fd; font-weight: 600; }
+    .loc-meta { color: #cbd5e1; font-family: 'JetBrains Mono', monospace; }
+    .loc-note { color: #e2e8f0; }
+    .loc-acts button { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0 4px; font-size: 15px; }
+    .loc-acts button:hover { color: white; }
+
+    /* Responsive Mobile */
+    @media (max-width: 800px) {
+      #bottom-panel { flex-direction: column; min-height: auto; }
+      #map-section { height: 250px; min-width: 100%; }
+      #bg-photo { max-height: 40vh; }
     }
   </style>
 </head>
 <body>
+
   <div id="upload-screen">
     <div class="upload-box">
       <h2>📷 Arsip Kegiatan Dinas</h2>
-      <p>Upload foto dokumentasi. Data lokasi akan tampil jelas di atas foto.</p>
-      <label class="btn">Pilih Foto<input type="file" id="photo-input" accept="image/*"></label>
+      <p>Upload foto. Panel bawah akan menjadi area kerja utama (Peta + Input Manual).</p>
+      <label class="btn">📂 Pilih Foto<input type="file" id="photo-input" accept="image/*"></label>
     </div>
   </div>
 
-  <div id="archive-container">
-    <img id="bg-photo" src="" alt="Arsip">
-    <div id="info-panel">
-      <div id="mini-map"></div>
-      <div id="data-section">
-        <div class="panel-header"><h3>📍 Titik Lokasi Kegiatan</h3><span id="count-badge">0</span></div>
-        <ul id="loc-list"></ul>
-        <div class="controls">
-          <button id="toggle-add">📌 Tambah Titik</button>
-          <button id="btn-download">📥 Unduh Arsip</button>
-          <button id="btn-reset">🔄 Reset</button>
+  <div id="app-container">
+    <div id="photo-area">
+      <img id="bg-photo" src="" alt="Dokumentasi">
+    </div>
+
+    <div id="bottom-panel">
+      <!-- Area Peta -->
+      <div id="map-section">
+        <div id="mini-map"></div>
+      </div>
+
+      <!-- Area Form & Data -->
+      <div id="form-section">
+        <div class="form-row">
+          <div class="form-group"><label>🌍 Latitude (Garis Lintang)</label><input type="number" step="any" id="in-lat" placeholder="-1.6101"></div>
+          <div class="form-group"><label>🌏 Longitude (Garis Bujur)</label><input type="number" step="any" id="in-lng" placeholder="103.6131"></div>
         </div>
-      </div>
-    </div>
-  </div>
+        <div class="form-row">
+          <div class="form-group"><label>🕒 Waktu Kegiatan</label><input type="datetime-local" id="in-time"></div>
+          <div class="form-group"><label>📝 Keterangan Kegiatan</label><input type="text" id="in-note" placeholder="Contoh: Koordinasi Dinas, Survey Lahan..."></div>
+        </div>
+        
+        <div class="btn-group">
+          <button class="btn-act btn-map" id="btn-map-mode" onclick="toggleMapMode()">📌 Klik Peta: OFF</button>
+          <button class="btn-act btn-add" onclick="addFromForm()">💾 Simpan Titik</button>
+        </div>
 
-  <!-- Modal Input -->
-  <div id="input-modal">
-    <div class="modal-card">
-      <h3>📌 Input Data Lokasi</h3>
-      <div class="modal-coords" id="modal-coords-display">📍 -.-, -.-</div>
-      <div class="form-group">
-        <label>Waktu Kegiatan</label>
-        <input type="datetime-local" id="m-time">
-      </div>
-      <div class="form-group">
-        <label>Nama / Keterangan Kegiatan</label>
-        <input type="text" id="m-note" placeholder="Contoh: Survey lahan, koordinasi dinas...">
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeModal()">Batal</button>
-        <button class="btn-save" onclick="saveFromModal()">💾 Simpan</button>
+        <ul id="loc-list"></ul>
+        
+        <div class="btn-group" style="margin-top: auto;">
+          <button class="btn-act btn-dl" onclick="downloadArchive()">📥 Unduh Arsip</button>
+          <button class="btn-act btn-rst" onclick="resetAll()">🔄 Reset</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-  <script src="app.js"></script>
+  <script>
+    let map, markers = [], locations = [];
+    let isMapMode = false;
+    const $ = id => document.getElementById(id);
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      $('photo-input').addEventListener('change', handlePhoto);
+      $('in-time').value = new Date().toISOString().slice(0, 16);
+    });
+
+    function handlePhoto(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        $('bg-photo').src = ev.target.result;
+        $('upload-screen').classList.add('hidden');
+        $('app-container').classList.add('active');
+        setTimeout(() => initMap(), 100);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function initMap() {
+      map = L.map('mini-map', { zoomControl: false }).setView([-1.6101, 103.6131], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        crossOrigin: 'anonymous', attribution: '© OSM'
+      }).addTo(map);
+      
+      map.invalidateSize(); // PENTING: Memastikan peta ter-render
+      
+      map.on('click', function(e) {
+        $('in-lat').value = e.latlng.lat.toFixed(6);
+        $('in-lng').value = e.latlng.lng.toFixed(6);
+        if (isMapMode) { savePoint(e.latlng.lat, e.latlng.lng); toggleMapMode(); }
+      });
+
+      renderMarkers(); renderList();
+    }
+
+    function toggleMapMode() {
+      isMapMode = !isMapMode;
+      $('btn-map-mode').textContent = isMapMode ? '✅ Klik Peta: ON' : '📌 Klik Peta: OFF';
+      $('btn-map-mode').classList.toggle('active', isMapMode);
+      map.getContainer().style.cursor = isMapMode ? 'crosshair' : 'default';
+    }
+
+    function addFromForm() {
+      const lat = parseFloat($('in-lat').value);
+      const lng = parseFloat($('in-lng').value);
+      if (!lat || !lng) { alert('⚠️ Koordinat Latitude & Longitude wajib diisi!'); return; }
+      savePoint(lat, lng);
+    }
+
+    function savePoint(lat, lng) {
+      const time = $('in-time').value || new Date().toISOString().slice(0, 16);
+      const note = $('in-note').value.trim() || 'Tanpa keterangan';
+      locations.push({ id: Date.now().toString(), lat, lng, time, note });
+      
+      saveData(); renderMarkers(); renderList();
+      $('in-time').value = new Date().toISOString().slice(0, 16); // Reset waktu
+      map.flyTo([lat, lng], 13);
+    }
+
+    function renderMarkers() {
+      markers.forEach(m => map.removeLayer(m)); markers = [];
+      locations.forEach(loc => {
+        const m = L.marker([loc.lat, loc.lng]).addTo(map);
+        m.bindPopup(`<b>${loc.time}</b><br>${loc.note}<br><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small>`);
+        markers.push(m);
+      });
+    }
+
+    function renderList() {
+      const list = $('loc-list'); list.innerHTML = '';
+      locations.slice().reverse().forEach(loc => {
+        list.innerHTML += `
+          <li class="loc-item">
+            <div class="loc-info">
+              <span class="loc-time">🕒 ${loc.time}</span>
+              <span class="loc-meta">📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</span>
+              <span class="loc-note">📝 ${loc.note}</span>
+            </div>
+            <div class="loc-acts">
+              <button onclick="focusLoc('${loc.id}')">🔍</button>
+              <button onclick="deleteLoc('${loc.id}')" style="color:#f87171;">🗑️</button>
+            </div>
+          </li>`;
+      });
+    }
+
+    window.focusLoc = (id) => {
+      const idx = locations.findIndex(l => l.id === id);
+      if (idx !== -1 && markers[idx]) { map.flyTo([locations[idx].lat, locations[idx].lng], 15); markers[idx].openPopup(); }
+    };
+
+    window.deleteLoc = (id) => {
+      if (!confirm('Hapus titik ini?')) return;
+      locations = locations.filter(l => l.id !== id);
+      saveData(); renderMarkers(); renderList();
+    };
+
+    function saveData() { try { localStorage.setItem('arsipData', JSON.stringify(locations)); } catch {} }
+    function loadData() { try { const d = localStorage.getItem('arsipData'); if (d) locations = JSON.parse(d); } catch {} }
+    
+    window.resetAll = () => {
+      if (!confirm('Reset semua data & foto?')) return;
+      locations = []; markers = []; localStorage.removeItem('arsipData');
+      $('app-container').classList.remove('active'); $('upload-screen').classList.remove('hidden'); $('photo-input').value = '';
+      if (map) map.remove(); map = null;
+    };
+
+    async function downloadArchive() {
+      const container = $('app-container');
+      const btn = document.querySelector('.btn-dl');
+      const hideEls = document.querySelectorAll('.btn-dl, .btn-rst, .btn-map-mode, .btn-add');
+      hideEls.forEach(el => { el.dataset.prev = el.style.display; el.style.display = 'none'; });
+
+      btn.textContent = '⏳ Memproses...';
+      await new Promise(r => setTimeout(r, 300));
+
+      try {
+        const canvas = await html2canvas(container, {
+          useCORS: true, allowTaint: true, scale: window.devicePixelRatio || 2,
+          backgroundColor: '#0f172a', logging: false
+        });
+        canvas.toBlob(blob => {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+          a.download = `arsip_${new Date().toISOString().slice(0,10)}.png`; a.click();
+        });
+      } catch (e) { alert('⚠️ Gagal unduh. Pastikan tile peta sudah termuat.'); }
+      finally {
+        btn.textContent = '📥 Unduh Arsip';
+        hideEls.forEach(el => el.style.display = el.dataset.prev || '');
+      }
+    }
+  </script>
 </body>
 </html>
