@@ -1,148 +1,166 @@
 // app.js
-let map, markers = [];
-let locations = [];
-let currentPhoto = null;
-let isAddingMarker = false;
+let map, markers = [], locations = [];
+let isAdding = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
-  loadFromLocalStorage();
-  setupEventListeners();
+  loadFromStorage();
+  setupEvents();
 });
 
 function initMap() {
-  // Default view: Jambi
-  map = L.map('map').setView([-1.6101, 103.6131], 10);
+  // Default view ke wilayah Jambi
+  map = L.map('map').setView([-1.6101, 103.6131], 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
+    attribution: '© OpenStreetMap'
   }).addTo(map);
-}
 
-function setupEventListeners() {
-  document.getElementById('photo-input').addEventListener('change', handlePhotoUpload);
-  document.getElementById('add-marker-mode').addEventListener('click', toggleAddMode);
-  document.getElementById('export-data').addEventListener('click', exportData);
-  document.getElementById('import-data').addEventListener('click', () => document.getElementById('import-input').click());
-  document.getElementById('import-input').addEventListener('change', importData);
-
-  map.on('click', function(e) {
-    if (isAddingMarker) showMarkerForm(e.latlng);
+  map.on('click', (e) => {
+    if (!isAdding) return;
+    showAddForm(e.latlng);
   });
 }
 
-function handlePhotoUpload(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    currentPhoto = ev.target.result;
-    const preview = document.getElementById('photo-preview');
-    preview.src = currentPhoto;
-    preview.style.display = 'block';
-  };
-  reader.readAsDataURL(file);
+function setupEvents() {
+  document.getElementById('add-btn').addEventListener('click', toggleAddMode);
+  document.getElementById('export-img').addEventListener('click', exportAsImage);
+  document.getElementById('export-json').addEventListener('click', exportJSON);
+  document.getElementById('import-json').addEventListener('click', () => document.getElementById('import-input').click());
+  document.getElementById('import-input').addEventListener('change', importJSON);
 }
 
 function toggleAddMode() {
-  isAddingMarker = !isAddingMarker;
-  const btn = document.getElementById('add-marker-mode');
-  btn.textContent = isAddingMarker ? '✅ Mode Aktif (Klik Peta)' : '📌 Mode Tambah Marker (Klik Peta)';
-  btn.style.background = isAddingMarker ? '#10b981' : '#2563eb';
-  map.getContainer().style.cursor = isAddingMarker ? 'crosshair' : 'default';
+  isAdding = !isAdding;
+  const btn = document.getElementById('add-btn');
+  btn.textContent = isAdding ? '✅ Klik Peta untuk Tambah' : '📌 Tambah Marker';
+  btn.style.background = isAdding ? '#10b981' : '#3b82f6';
+  map.getContainer().style.cursor = isAdding ? 'crosshair' : 'grab';
 }
 
-function showMarkerForm(latlng) {
-  const popupContent = `
-    <div style="min-width:220px; padding:5px;">
-      <h3 style="margin:0 0 8px;">Tambah Lokasi</h3>
-      <p style="margin:4px 0; font-size:0.85rem;">Lat: ${latlng.lat.toFixed(5)} | Lng: ${latlng.lng.toFixed(5)}</p>
-      <label style="display:block; margin:6px 0;">Waktu: <input type="datetime-local" id="marker-time" value="${new Date().toISOString().slice(0,16)}" style="width:100%; padding:4px;"></label>
-      <label style="display:block; margin:6px 0;">Catatan: <input type="text" id="marker-note" placeholder="Kegiatan di sini..." style="width:100%; padding:4px;"></label>
-      <div style="margin-top:8px; display:flex; gap:6px;">
-        <button id="save-marker" class="btn-sm" style="background:#10b981;">Simpan</button>
-        <button id="cancel-marker" class="btn-sm" style="background:#6b7280;">Batal</button>
+function showAddForm(latlng) {
+  const content = `
+    <div style="min-width:220px; padding:4px;">
+      <h3 style="margin-bottom:6px; font-size:1rem;">Tambah Titik Lokasi</h3>
+      <p style="font-size:0.82rem; margin-bottom:8px; font-family:monospace;">📍 ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}</p>
+      <label style="display:block; margin-bottom:6px; font-size:0.85rem;">Waktu:
+        <input type="datetime-local" id="popup-time" value="${new Date().toISOString().slice(0,16)}" style="width:100%; margin-top:3px; padding:5px; border:1px solid #cbd5e1; border-radius:4px;">
+      </label>
+      <label style="display:block; margin-bottom:8px; font-size:0.85rem;">Catatan:
+        <input type="text" id="popup-note" placeholder="Contoh: Survey lahan, rapat desa..." style="width:100%; margin-top:3px; padding:5px; border:1px solid #cbd5e1; border-radius:4px;">
+      </label>
+      <div style="display:flex; gap:6px;">
+        <button id="save-btn" style="flex:1; padding:7px; background:#10b981; color:white; border:none; border-radius:4px; cursor:pointer;">Simpan</button>
+        <button id="cancel-btn" style="flex:1; padding:7px; background:#64748b; color:white; border:none; border-radius:4px; cursor:pointer;">Batal</button>
       </div>
     </div>
   `;
-  const popup = L.popup().setLatLng(latlng).setContent(popupContent).openOn(map);
+  const popup = L.popup().setLatLng(latlng).setContent(content).openOn(map);
 
-  // Leaflet menambahkan konten ke DOM setelah popup dibuka
   setTimeout(() => {
-    document.getElementById('save-marker').addEventListener('click', () => {
-      const time = document.getElementById('marker-time').value;
-      const note = document.getElementById('marker-note').value;
-      addLocation(latlng, time, note, currentPhoto);
+    document.getElementById('save-btn').onclick = () => {
+      const time = document.getElementById('popup-time').value;
+      const note = document.getElementById('popup-note').value;
+      addLocation({ lat: latlng.lat, lng: latlng.lng }, time, note);
       map.closePopup();
-    });
-    document.getElementById('cancel-marker').addEventListener('click', () => map.closePopup());
+    };
+    document.getElementById('cancel-btn').onclick = () => map.closePopup();
   }, 0);
 }
 
-function addLocation(latlng, time, note, photo) {
+function addLocation(coord, time, note) {
   const id = Date.now().toString();
-  const location = { id, lat: latlng.lat, lng: latlng.lng, time, note, photo: photo || null };
-  locations.push(location);
-  
-  try {
-    localStorage.setItem('mapLocations', JSON.stringify(locations));
-  } catch (e) {
-    alert('⚠️ Penyimpanan browser penuh. Silakan Export JSON lalu hapus data lama.');
-  }
-  
-  renderMarker(location);
-  updateList();
-  isAddingMarker = false;
-  document.getElementById('add-marker-mode').textContent = '📌 Mode Tambah Marker (Klik Peta)';
-  document.getElementById('add-marker-mode').style.background = '#2563eb';
-  map.getContainer().style.cursor = 'default';
-}
+  const loc = { id, lat: coord.lat, lng: coord.lng, time, note };
+  locations.push(loc);
 
-function renderMarker(loc) {
   const marker = L.marker([loc.lat, loc.lng]).addTo(map);
-  const imgHtml = loc.photo ? `<img src="${loc.photo}" style="max-width:180px; margin-top:6px; border-radius:4px;">` : '';
-  marker.bindPopup(`<b>${loc.time}</b><br>${loc.note}<br>${imgHtml}`);
-  markers.push({ id: loc.id, marker });
+  marker.bindPopup(`<b>🕒 ${time}</b><br>📝 ${note || 'Tanpa catatan'}`);
+  markers.push({ id, marker });
+
+  saveToStorage();
+  updateFootnote();
+  isAdding = false;
+  document.getElementById('add-btn').textContent = '📌 Tambah Marker';
+  document.getElementById('add-btn').style.background = '#3b82f6';
+  map.getContainer().style.cursor = 'grab';
 }
 
-function updateList() {
-  const list = document.getElementById('saved-locations');
+function updateFootnote() {
+  const list = document.getElementById('locations-list');
   list.innerHTML = '';
-  locations.slice().reverse().forEach(loc => { // Tampilkan yang terbaru di atas
+  document.getElementById('marker-count').textContent = `${locations.length} lokasi`;
+
+  // Tampilkan dari yang terbaru
+  locations.slice().reverse().forEach(loc => {
     const li = document.createElement('li');
+    li.className = 'loc-item';
+    li.dataset.id = loc.id;
     li.innerHTML = `
-      <div>
-        <strong>${loc.time}</strong> - ${loc.note || 'Tanpa catatan'}
-        <small>Lat: ${loc.lat.toFixed(5)}, Lng: ${loc.lng.toFixed(5)}</small>
+      <div class="loc-header">
+        <span class="loc-time">🕒 ${loc.time || '-'}</span>
+        <span class="loc-coords">${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</span>
       </div>
-      <div>
-        <button onclick="flyTo(${loc.lat}, ${loc.lng})" class="btn-sm">📍 Lihat</button>
-        <button onclick="deleteLocation('${loc.id}')" class="btn-sm btn-delete">🗑️</button>
+      <div class="loc-note">${loc.note || 'Tanpa catatan'}</div>
+      <div class="loc-actions">
+        <button class="btn-view" onclick="focusMarker('${loc.id}')">📍 Lihat</button>
+        <button class="btn-del" onclick="deleteLoc('${loc.id}')">🗑️ Hapus</button>
       </div>
     `;
     list.appendChild(li);
   });
 }
 
-window.flyTo = (lat, lng) => map.flyTo([lat, lng], 15);
-window.deleteLocation = (id) => {
-  if (!confirm('Hapus data ini?')) return;
-  locations = locations.filter(l => l.id !== id);
-  markers = markers.filter(m => { if (m.id === id) m.marker.remove(); return m.id !== id; });
-  localStorage.setItem('mapLocations', JSON.stringify(locations));
-  updateList();
+window.focusMarker = (id) => {
+  const m = markers.find(x => x.id === id);
+  if (m) {
+    map.flyTo([m.marker.getLatLng().lat, m.marker.getLatLng().lng], 15);
+    m.marker.openPopup();
+    document.querySelectorAll('.loc-item').forEach(el => el.classList.remove('active'));
+    const el = document.querySelector(`.loc-item[data-id="${id}"]`);
+    if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
 };
 
-function exportData() {
-  const blob = new Blob([JSON.stringify(locations, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `maps-data-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+window.deleteLoc = (id) => {
+  if (!confirm('Hapus lokasi ini?')) return;
+  locations = locations.filter(l => l.id !== id);
+  const m = markers.find(x => x.id === id);
+  if (m) map.removeLayer(m.marker);
+  markers = markers.filter(x => x.id !== id);
+  saveToStorage();
+  updateFootnote();
+};
+
+function saveToStorage() {
+  try {
+    localStorage.setItem('mapMakerData', JSON.stringify(locations));
+  } catch (e) {
+    alert('⚠️ Penyimpanan browser penuh. Silakan Export JSON.');
+  }
 }
 
-function importData(e) {
+function loadFromStorage() {
+  try {
+    const data = localStorage.getItem('mapMakerData');
+    if (data) {
+      locations = JSON.parse(data);
+      locations.forEach(loc => {
+        const m = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(`<b>${loc.time}</b><br>${loc.note}`);
+        markers.push({ id: loc.id, marker: m });
+      });
+      updateFootnote();
+    }
+  } catch {}
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(locations, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `maps-data-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -151,11 +169,11 @@ function importData(e) {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data)) throw new Error();
       locations = data;
-      localStorage.setItem('mapLocations', JSON.stringify(locations));
-      markers.forEach(m => m.marker.remove());
+      markers.forEach(m => map.removeLayer(m.marker));
       markers = [];
-      loadFromLocalStorage();
-      alert('✅ Data berhasil diimpor!');
+      saveToStorage();
+      loadFromStorage();
+      alert('✅ Data berhasil dimuat!');
     } catch {
       alert('❌ File JSON tidak valid.');
     }
@@ -163,11 +181,35 @@ function importData(e) {
   reader.readAsText(file);
 }
 
-function loadFromLocalStorage() {
+async function exportAsImage() {
+  const btn = document.getElementById('export-img');
+  btn.textContent = '⏳ Memproses...';
+  btn.disabled = true;
+
   try {
-    const stored = localStorage.getItem('mapLocations');
-    if (stored) locations = JSON.parse(stored);
-  } catch { locations = []; }
-  locations.forEach(loc => renderMarker(loc));
-  updateList();
+    // Tunggu render peta selesai
+    await new Promise(r => setTimeout(r, 300));
+    const canvas = await html2canvas(document.getElementById('capture-area'), {
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      scale: 2, // Resolusi tinggi
+      logging: false,
+      foreignObjectRendering: true
+    });
+
+    canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `maps-screenshot-${new Date().toISOString().slice(0,10)}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, 'image/png');
+  } catch (err) {
+    console.error(err);
+    alert('Gagal membuat gambar. Pastikan koneksi internet aktif untuk memuat tile peta.');
+  } finally {
+    btn.textContent = '📸 Unduh Gambar';
+    btn.disabled = false;
+  }
 }
