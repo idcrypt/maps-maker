@@ -8,13 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('toggle-add').addEventListener('click', toggleAddMode);
   $('btn-download').addEventListener('click', downloadArchive);
   $('btn-reset').addEventListener('click', resetData);
-
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('.btn-save')) handleSavePoint();
-    if (e.target.closest('.btn-cancel')) map.closePopup();
-    if (e.target.closest('.btn-focus')) focusLoc(e.target.dataset.id);
-    if (e.target.closest('.btn-delete')) deleteLoc(e.target.dataset.id);
-  });
 });
 
 function handlePhoto(e) {
@@ -24,20 +17,16 @@ function handlePhoto(e) {
   reader.onload = ev => {
     const img = new Image();
     img.onload = () => {
-      // 1. Hitung skala agar muat di layar, TAPI pertahankan rasio asli
       const maxW = window.innerWidth * 0.95;
-      const maxH = window.innerHeight * 0.85;
+      const maxH = window.innerHeight * 0.8;
       const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
       
       const w = Math.round(img.naturalWidth * scale);
       const h = Math.round(img.naturalHeight * scale);
-      const footerH = Math.round(h * 0.125); // Footer tepat 1/8 tinggi foto
-
-      // 2. KUNCI dimensi container secara eksplisit (pixel)
+      
       const container = $('archive-container');
       container.style.width = `${w}px`;
-      container.style.height = `${h + footerH}px`;
-      $('bottom-panel').style.height = `${footerH}px`;
+      container.style.height = `${h}px`;
 
       $('bg-photo').src = ev.target.result;
       $('upload-screen').classList.add('hidden');
@@ -63,36 +52,38 @@ function initMap() {
 function toggleAddMode() {
   isAdding = !isAdding;
   $('toggle-add').classList.toggle('btn-active', isAdding);
-  $('toggle-add').textContent = isAdding ? '✅ Klik Peta' : '📌 Tambah';
+  $('toggle-add').textContent = isAdding ? '✅ Klik pada Peta' : '📌 Tambah Titik';
   map.getContainer().style.cursor = isAdding ? 'crosshair' : 'default';
 }
 
 function handleMapClick(e) {
   if (!isAdding) return;
   pendingLatLng = e.latlng;
-  const content = `
-    <div class="popup-form">
-      <label>Waktu</label><input type="datetime-local" id="p-time" value="${new Date().toISOString().slice(0,16)}">
-      <label>Catatan</label><input type="text" id="p-note" placeholder="Kegiatan...">
-      <div class="btn-group"><button class="btn-save">Simpan</button><button class="btn-cancel">Batal</button></div>
-    </div>`;
-  L.popup().setLatLng(pendingLatLng).setContent(content).openOn(map);
+  openModal(e.latlng);
 }
 
-function handleSavePoint() {
+// Modal Logic
+function openModal(latlng) {
+  $('m-time').value = new Date().toISOString().slice(0, 16);
+  $('m-note').value = '';
+  $('modal-coords-display').textContent = `📍 ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+  $('input-modal').classList.add('active');
+}
+window.closeModal = () => $('input-modal').classList.remove('active');
+window.saveFromModal = () => {
   if (!pendingLatLng) return;
-  const time = document.getElementById('p-time').value;
-  const note = document.getElementById('p-note').value;
+  const time = $('m-time').value;
+  const note = $('m-note').value.trim();
   locations.push({ id: Date.now().toString(), lat: pendingLatLng.lat, lng: pendingLatLng.lng, time, note });
   saveData(); renderMarkers(); renderList();
-  toggleAddMode(); map.closePopup(); pendingLatLng = null;
-}
+  closeModal(); toggleAddMode(); pendingLatLng = null;
+};
 
 function renderMarkers() {
   markers.forEach(m => map.removeLayer(m)); markers = [];
   locations.forEach(loc => {
     const m = L.marker([loc.lat, loc.lng]).addTo(map);
-    m.bindPopup(`<b>${loc.time}</b><br>${loc.note}<br><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small>`);
+    m.bindPopup(`<b>${loc.time}</b><br>${loc.note}`);
     markers.push(m);
   });
   $('count-badge').textContent = `${locations.length} titik`;
@@ -103,21 +94,34 @@ function renderList() {
   locations.slice().reverse().forEach(loc => {
     list.innerHTML += `
       <li class="loc-item">
-        <div><div class="loc-coords">📍 ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</div><div class="loc-note">${loc.note}</div></div>
-        <div class="loc-actions"><button class="btn-focus" data-id="${loc.id}">🔍</button><button class="btn-delete" data-id="${loc.id}">🗑️</button></div>
+        <div class="loc-main">
+          <span class="loc-time">🕒 ${loc.time}</span>
+          <div class="loc-meta">
+            <span class="loc-coords">${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</span>
+          </div>
+          <span class="loc-note">${loc.note || '-'}</span>
+        </div>
+        <div class="loc-actions">
+          <button class="btn-focus" data-id="${loc.id}" title="Lihat di Peta">🔍</button>
+          <button class="btn-delete" data-id="${loc.id}" title="Hapus">🗑️</button>
+        </div>
       </li>`;
   });
-}
-
-function focusLoc(id) {
-  const idx = locations.findIndex(l => l.id === id);
-  if (idx > -1 && markers[idx]) map.flyTo([locations[idx].lat, locations[idx].lng], 14), markers[idx].openPopup();
-}
-
-function deleteLoc(id) {
-  if (!confirm('Hapus titik ini?')) return;
-  locations = locations.filter(l => l.id !== id);
-  saveData(); renderMarkers(); renderList();
+  
+  // Event delegation untuk tombol dinamis
+  document.querySelectorAll('.btn-focus').forEach(btn => {
+    btn.onclick = () => {
+      const idx = locations.findIndex(l => l.id === btn.dataset.id);
+      if (idx > -1 && markers[idx]) map.flyTo([locations[idx].lat, locations[idx].lng], 14), markers[idx].openPopup();
+    };
+  });
+  document.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.onclick = () => {
+      if (!confirm('Hapus titik ini?')) return;
+      locations = locations.filter(l => l.id !== btn.dataset.id);
+      saveData(); renderMarkers(); renderList();
+    };
+  });
 }
 
 function saveData() { try { localStorage.setItem('arsipData', JSON.stringify(locations)); } catch {} }
@@ -133,23 +137,19 @@ async function downloadArchive() {
   const container = $('archive-container');
   const btn = $('btn-download');
   
-  // 1. Sembunyikan UI yang tidak perlu di hasil gambar
+  // Sembunyikan UI saat capture
   const hideEls = document.querySelectorAll('.controls button, .btn-delete, .leaflet-control-zoom');
   hideEls.forEach(el => { el.dataset.prevDisp = el.style.display; el.style.display = 'none'; });
 
-  btn.textContent = '⏳';
-  await new Promise(r => setTimeout(r, 300));
+  btn.textContent = '⏳ Memproses...'; btn.disabled = true;
+  await new Promise(r => setTimeout(r, 400)); // Tunggu UI render
 
   try {
-    // 2. Capture dengan dimensi EKSAK container (yang sudah dikunci rasionya)
     const canvas = await html2canvas(container, {
       width: container.offsetWidth,
       height: container.offsetHeight,
-      scale: 2, // Kualitas tajam, TIDAK mengubah rasio
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#000',
-      logging: false
+      scale: window.devicePixelRatio || 2,
+      useCORS: true, allowTaint: true, backgroundColor: '#000', logging: false
     });
     
     canvas.toBlob(blob => {
@@ -161,7 +161,7 @@ async function downloadArchive() {
     });
   } catch (e) { alert('Gagal unduh. Pastikan tile peta sudah termuat.'); }
   finally {
-    btn.textContent = '📥 Unduh';
+    btn.textContent = '📥 Unduh Arsip'; btn.disabled = false;
     hideEls.forEach(el => { el.style.display = el.dataset.prevDisp || ''; });
   }
 }
