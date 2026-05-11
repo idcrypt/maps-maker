@@ -6,80 +6,68 @@
   <title>Arsip Peta Dinas</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root { --primary: #2563eb; --success: #10b981; --dark: #0f172a; --glass: rgba(15, 23, 42, 0.85); --text: #e2e8f0; }
+    :root { --glass: rgba(15, 23, 42, 0.88); --text: #e2e8f0; --accent: #3b82f6; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    body { 
-      font-family: 'Segoe UI', system-ui, sans-serif; 
-      background: #1e293b; color: var(--text); 
-      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-      overflow-y: auto; /* Agar foto panjang bisa di-scroll */
-    }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
-    /* Upload Screen */
-    #upload-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0f172a; z-index: 100; transition: 0.4s; }
+    #upload-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0f172a; z-index: 100; transition: 0.3s; }
     #upload-screen.hidden { opacity: 0; pointer-events: none; }
-    .upload-box { background: white; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; color: #1e293b; }
+    .upload-box { background: #1e293b; padding: 2rem; border-radius: 12px; text-align: center; max-width: 380px; width: 90%; border: 1px solid #334155; }
+    .upload-box h2 { margin-bottom: 0.5rem; color: white; }
+    .upload-box p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.9rem; }
     input[type="file"] { display: none; }
-    .btn-upload { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn { padding: 10px 18px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+    .btn:hover { background: #2563eb; }
 
-    /* Archive Container: Ukurannya akan di-set via JS */
+    /* Container: Ukuran akan dikunci via JS, tidak pakai 100vh/vw */
     #archive-container { 
       position: relative; 
       background: #000; 
       display: none; 
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      margin: 20px 0; /* Memberi jarak atas-bawah */
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      margin: 0 auto;
+      overflow: hidden;
     }
     #archive-container.active { display: block; }
+    #bg-photo { display: block; width: 100%; height: 100%; object-fit: cover; }
 
-    #bg-photo { display: block; width: 100%; height: 100%; object-fit: fill; }
-
-    /* Bottom Panel */
     #bottom-panel {
       position: absolute; bottom: 0; left: 0; right: 0;
-      background: var(--glass); backdrop-filter: blur(8px);
-      display: flex; gap: 10px; padding: 8px;
-      border-top: 1px solid rgba(255,255,255,0.2);
-      overflow: hidden; /* Tinggi diatur via JS */
+      background: var(--glass); backdrop-filter: blur(10px);
+      display: flex; gap: 8px; padding: 6px;
+      border-top: 1px solid rgba(255,255,255,0.15);
+      overflow: hidden;
     }
     #mini-map { flex: 2; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); background: #334155; }
-    
-    #data-section { flex: 3; display: flex; flex-direction: column; color: white; overflow: hidden; }
-    .panel-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
-    .panel-header h3 { font-size: 14px; font-weight: 600; }
-    .panel-header span { font-size: 11px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; }
-    
-    #loc-list { list-style: none; overflow-y: auto; flex: 1; margin-right: 6px; font-size: 12px; }
-    .loc-item { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
-    .loc-time { color: #93c5fd; font-weight: 600; }
+    #data-section { flex: 3; display: flex; flex-direction: column; color: white; font-size: 12px; }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .panel-header span { background: rgba(255,255,255,0.15); padding: 2px 5px; border-radius: 4px; font-size: 10px; }
+    #loc-list { list-style: none; overflow-y: auto; flex: 1; margin: 0; padding-right: 4px; }
+    .loc-item { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .loc-coords { font-family: monospace; color: #cbd5e1; font-size: 11px; }
-    .loc-note { color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
-    
-    .loc-actions button { background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 12px; padding: 0 4px; }
+    .loc-note { color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+    .loc-actions button { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0 3px; font-size: 11px; }
     .loc-actions button:hover { color: white; }
 
-    .controls { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
-    .controls button { padding: 4px 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
-    .controls button:hover { background: rgba(255,255,255,0.3); }
-    .btn-active { background: var(--success) !important; }
+    .controls { display: flex; gap: 4px; margin-top: auto; padding-top: 4px; }
+    .controls button { padding: 4px 8px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px; cursor: pointer; font-size: 11px; }
+    .controls button:hover { background: rgba(255,255,255,0.25); }
+    .btn-active { background: #10b981 !important; border-color: #10b981 !important; }
 
-    /* Popup */
-    .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 6px; }
-    .popup-form label { display: block; margin: 4px 0 2px; font-size: 12px; }
-    .popup-form input { width: 100%; padding: 4px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 3px; }
-    .popup-form .btn-group { display: flex; gap: 4px; margin-top: 6px; }
-    .popup-form button { flex: 1; padding: 4px; border: none; border-radius: 3px; cursor: pointer; }
-    .btn-save { background: var(--success); color: white; }
+    .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 6px; font-size: 12px; }
+    .popup-form input { width: 100%; padding: 4px; margin: 4px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 3px; font-size: 11px; }
+    .popup-form .btn-group { display: flex; gap: 4px; margin-top: 4px; }
+    .popup-form button { flex: 1; padding: 4px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+    .btn-save { background: #10b981; color: white; }
     .btn-cancel { background: #475569; color: white; }
   </style>
 </head>
 <body>
   <div id="upload-screen">
     <div class="upload-box">
-      <h2>📷 Arsip Dinas</h2>
-      <p>Upload foto dokumentasi. Rasio asli foto akan dipertahankan.</p>
-      <label class="btn-upload">Pilih Foto<input type="file" id="photo-input" accept="image/*"></label>
+      <h2>📷 Arsip Kegiatan Dinas</h2>
+      <p>Upload foto. Rasio asli akan dipertahankan 100%.</p>
+      <label class="btn">Pilih Foto<input type="file" id="photo-input" accept="image/*"></label>
     </div>
   </div>
 
@@ -88,10 +76,10 @@
     <div id="bottom-panel">
       <div id="mini-map"></div>
       <div id="data-section">
-        <div class="panel-header"><h3>📍 Data Lokasi</h3><span id="count-badge">0</span></div>
+        <div class="panel-header"><span>📍 Titik Lokasi</span><span id="count-badge">0</span></div>
         <ul id="loc-list"></ul>
         <div class="controls">
-          <button id="toggle-add">📌 Tambah Titik</button>
+          <button id="toggle-add">📌 Tambah</button>
           <button id="btn-download">📥 Unduh</button>
           <button id="btn-reset">🔄 Reset</button>
         </div>
