@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maps Maker - Lokasi & Foto</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>📍 Maps Maker - Pencatat Lokasi & Foto</h1>
+  </header>
+
+  <main>
+    <section id="photo-section">
+      <h2>📷 Upload Foto</h2>
+      <input type="file" id="photo-input" accept="image/*">
+      <img id="photo-preview" src="" alt="Preview Foto" style="display:none;">
+      <p class="note">💡 Foto akan tampil di popup marker & preview atas. Data disimpan di browser.</p>
+    </section>
+
+    <section id="map-section">
+      <h2>🗺️ Peta Koordinat</h2>
+      <div id="map"></div>
+      <div id="controls">
+        <button id="add-marker-mode">📌 Mode Tambah Marker (Klik Peta)</button>
+        <button id="export-data">💾 Export JSON</button>
+        <button id="import-data">📂 Import JSON</button>
+        <input type="file" id="import-input" accept=".json" style="display:none;">
+      </div>
+    </section>
+
+    <section id="data-list">
+      <h2>📋 Data Tersimpan</h2>
+      <ul id="saved-locations"></ul>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
