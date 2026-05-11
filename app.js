@@ -16,7 +16,7 @@ function setupEventListeners() {
   $('btn-download').addEventListener('click', downloadArchive);
   $('btn-reset').addEventListener('click', resetData);
 
-  // Event Delegation untuk tombol dinamis di popup & daftar
+  // Event Delegation
   document.addEventListener('click', (e) => {
     const target = e.target;
     if (target.closest('.btn-save')) handleSavePoint();
@@ -115,7 +115,7 @@ function renderList() {
       </div>
       <div class="loc-actions">
         <button class="btn-focus" data-id="${loc.id}" title="Lihat di Peta">🔍</button>
-        <button class="btn-delete" data-id="${loc.id}" title="Hapus" style="color:#f87171;">🗑️</button>
+        <button class="btn-delete" data-id="${loc.id}" title="Hapus">🗑️</button>
       </div>
     `;
     list.appendChild(li);
@@ -142,7 +142,6 @@ function deleteLoc(id) {
   renderList();
 }
 
-// Storage
 function saveData() {
   try { localStorage.setItem('arsip_dinas_data', JSON.stringify(locations)); } catch {}
 }
@@ -163,20 +162,41 @@ function resetData() {
   if (map) map.remove(); map = null;
 }
 
-// Export PNG
+// 📥 FUNGSI UNDUH YANG DIPERBAIKI
 async function downloadArchive() {
+  const container = $('archive-container');
   const btn = $('btn-download');
   btn.textContent = '⏳ Menyiapkan...'; btn.disabled = true;
-  $('toggle-add').style.display = 'none'; 
-  $('btn-download').style.display = 'none'; 
-  $('btn-reset').style.display = 'none';
-
+  
+  // 1. Identifikasi & sembunyikan elemen yang tidak diinginkan di hasil gambar
+  const zoomCtrl = document.querySelector('.leaflet-control-zoom');
+  const delBtns = document.querySelectorAll('.btn-delete');
+  const ctrlBtns = document.querySelectorAll('.controls button');
+  const hideList = [zoomCtrl, ...delBtns, ...ctrlBtns];
+  
+  // Simpan style asli, lalu sembunyikan
+  hideList.forEach(el => { 
+    if(el) { 
+      el.dataset.origDisplay = el.style.display || ''; 
+      el.style.display = 'none'; 
+    } 
+  });
+  
+  // Tunggu DOM update sebelum capture
   await new Promise(r => setTimeout(r, 300));
+  
   try {
-    const canvas = await html2canvas($('archive-container'), {
-      useCORS: true, allowTaint: true, scale: 2, backgroundColor: '#0f172a',
-      logging: false, windowWidth: window.innerWidth, windowHeight: window.innerHeight
+    // 2. Capture dengan dimensi eksak 1:1 layar
+    const canvas = await html2canvas(container, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 1, // 1:1 persis ukuran layar
+      backgroundColor: '#0f172a',
+      logging: false,
+      // Tidak perlu width/height manual, html2canvas otomatis mengikuti ukuran container
     });
+    
+    // 3. Download
     canvas.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -188,7 +208,10 @@ async function downloadArchive() {
     console.error(e);
     alert('Gagal mengunduh. Pastikan tile peta sudah termuat penuh.');
   } finally {
+    // 4. Kembalikan semua tombol
+    hideList.forEach(el => { 
+      if(el) el.style.display = el.dataset.origDisplay; 
+    });
     btn.textContent = '📥 Unduh Arsip'; btn.disabled = false;
-    $('toggle-add').style.display = ''; $('btn-download').style.display = ''; $('btn-reset').style.display = '';
   }
 }
