@@ -3,116 +3,105 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arsip Peta Dinas - Maps Maker</title>
+  <title>Maps Maker - Arsip Dinas</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root { --bg: #0f172a; --panel: rgba(15, 23, 42, 0.95); --accent: #3b82f6; --success: #10b981; --text: #f8fafc; --border: #334155; }
+    :root { --bg: #0f172a; --glass: rgba(15, 23, 42, 0.88); --accent: #3b82f6; --success: #10b981; --danger: #ef4444; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 10px; overflow-y: auto; }
+    body { background: var(--bg); color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 10px; }
 
-    /* Upload Screen */
-    #upload-screen { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg); z-index: 100; transition: 0.3s; }
+    /* Upload Screen: Hanya Icon */
+    #upload-screen { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; background: var(--bg); z-index: 100; transition: 0.3s; }
     #upload-screen.hidden { opacity: 0; pointer-events: none; }
-    .upload-box { background: #1e293b; padding: 2rem; border-radius: 12px; text-align: center; border: 1px solid var(--border); max-width: 90%; width: 400px; }
-    .upload-box h2 { margin-bottom: 0.5rem; } .upload-box p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.95rem; }
-    input[type="file"] { display: none; }
-    .btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .upload-icon { font-size: 5rem; cursor: pointer; opacity: 0.6; transition: 0.2s; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
+    .upload-icon:hover { opacity: 1; transform: scale(1.1); }
 
     /* Main Container */
-    #app-container { display: none; flex-direction: column; width: 100%; max-width: 1200px; gap: 10px; margin-bottom: 20px; }
-    #app-container.active { display: flex; }
+    #app { display: none; flex-direction: column; width: 100%; max-width: 1000px; gap: 10px; margin-bottom: 20px; }
+    #app.active { display: flex; }
+    #photo-wrap { background: #000; border-radius: 8px; overflow: hidden; width: 100%; text-align: center; }
+    #bg-photo { max-height: 55vh; max-width: 100%; object-fit: contain; display: block; margin: 0 auto; }
 
-    /* Photo Area */
-    #photo-area { background: #000; border-radius: 8px; overflow: hidden; width: 100%; display: flex; justify-content: center; align-items: center; }
-    #bg-photo { display: block; max-height: 55vh; max-width: 100%; object-fit: contain; }
-
-    /* Bottom Functional Panel (DITINGGIKAN & FUNGSIONAL) */
-    #bottom-panel { 
-      background: var(--panel); backdrop-filter: blur(12px);
-      border-radius: 12px; border: 1px solid var(--border);
-      padding: 14px; display: flex; gap: 14px; flex-wrap: wrap;
-      min-height: 38vh; /* 38% tinggi layar */
+    /* Bottom Functional Panel */
+    #panel { 
+      background: var(--glass); backdrop-filter: blur(10px);
+      border-radius: 12px; padding: 12px; display: flex; gap: 12px; flex-wrap: wrap;
+      min-height: 280px; border: 1px solid rgba(255,255,255,0.1);
     }
-    #map-section { flex: 1.2; min-width: 280px; height: 100%; min-height: 260px; border-radius: 8px; overflow: hidden; position: relative; background: #1e293b; }
+    #map-box { flex: 1.2; min-width: 280px; height: 240px; border-radius: 8px; overflow: hidden; position: relative; background: #1e293b; }
     #mini-map { width: 100%; height: 100%; }
 
-    #form-section { flex: 1.8; min-width: 300px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
-    
-    .form-row { display: flex; gap: 10px; }
-    .form-group { flex: 1; display: flex; flex-direction: column; }
-    .form-group label { font-size: 12px; color: #94a3b8; margin-bottom: 5px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
-    .form-group input { 
-      padding: 10px; background: #0f172a; border: 1px solid var(--border); 
-      border-radius: 6px; color: white; font-size: 14px; outline: none; width: 100%;
-    }
-    .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
-
-    .btn-group { display: flex; gap: 8px; margin-top: 4px; }
-    .btn-act { padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; color: white; font-size: 14px; transition: 0.2s; flex: 1; }
-    .btn-map { background: #64748b; } .btn-map.active { background: var(--success); }
+    #control-box { flex: 1.8; min-width: 300px; display: flex; flex-direction: column; gap: 8px; }
+    .row { display: flex; gap: 8px; }
+    .inp { flex: 1; padding: 9px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 14px; outline: none; }
+    .inp:focus { border-color: var(--accent); }
+    .btn { padding: 9px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; color: #fff; font-size: 13px; transition: 0.2s; flex: 1; }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-map { background: #475569; } .btn-map.on { background: var(--success); }
     .btn-add { background: var(--accent); }
-    .btn-dl { background: var(--success); } .btn-rst { background: #ef4444; }
-    .btn-act:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-dl { background: var(--success); } .btn-rst { background: var(--danger); }
 
-    #loc-list { list-style: none; overflow-y: auto; max-height: 150px; padding-right: 4px; margin-top: 4px; }
-    .loc-item { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-    .loc-info { display: flex; flex-direction: column; gap: 2px; }
-    .loc-time { color: #93c5fd; font-weight: 600; }
-    .loc-meta { color: #cbd5e1; font-family: 'JetBrains Mono', monospace; }
-    .loc-note { color: #e2e8f0; }
-    .loc-acts button { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0 4px; font-size: 15px; }
-    .loc-acts button:hover { color: white; }
+    #list { list-style: none; overflow-y: auto; max-height: 110px; padding-right: 4px; margin: 4px 0; }
+    .loc-item { background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 6px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .loc-meta { color: #cbd5e1; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .loc-acts button { background: none; border: none; color: #60a5fa; cursor: pointer; padding: 0 4px; font-size: 14px; }
+    .loc-acts button:hover { color: #fff; }
 
-    /* Responsive Mobile */
-    @media (max-width: 800px) {
-      #bottom-panel { flex-direction: column; min-height: auto; }
-      #map-section { height: 250px; min-width: 100%; }
+    /* Overlay Data untuk Hasil Unduh (Hidden Normally) */
+    #export-stamp { 
+      display: none; position: absolute; bottom: 10px; left: 10px; right: 10px;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(6px);
+      color: #fff; padding: 10px; border-radius: 8px; font-size: 12px;
+      border-left: 4px solid var(--success);
+    }
+    #export-stamp h4 { margin: 0 0 4px; color: #93c5fd; font-size: 13px; }
+    #export-list { list-style: none; padding: 0; margin: 0; }
+    #export-list li { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; }
+    #export-list li:last-child { border: none; }
+    .hide-dl { display: none !important; }
+
+    @media (max-width: 700px) {
+      #panel { flex-direction: column; }
+      #map-box { height: 220px; min-width: 100%; }
       #bg-photo { max-height: 40vh; }
     }
   </style>
 </head>
 <body>
-
   <div id="upload-screen">
-    <div class="upload-box">
-      <h2>📷 Arsip Kegiatan Dinas</h2>
-      <p>Upload foto. Panel bawah akan menjadi area kerja utama (Peta + Input Manual).</p>
-      <label class="btn">📂 Pilih Foto<input type="file" id="photo-input" accept="image/*"></label>
-    </div>
+    <label for="photo-input" class="upload-icon" title="Upload Foto">📷</label>
+    <input type="file" id="photo-input" hidden accept="image/*">
   </div>
 
-  <div id="app-container">
-    <div id="photo-area">
+  <div id="app">
+    <div id="photo-wrap">
       <img id="bg-photo" src="" alt="Dokumentasi">
+      <!-- Stamp yang muncul hanya saat unduh -->
+      <div id="export-stamp">
+        <h4>📍 DATA LOKASI KEGIATAN DINAS</h4>
+        <ul id="export-list"></ul>
+      </div>
     </div>
 
-    <div id="bottom-panel">
-      <!-- Area Peta -->
-      <div id="map-section">
-        <div id="mini-map"></div>
-      </div>
-
-      <!-- Area Form & Data -->
-      <div id="form-section">
-        <div class="form-row">
-          <div class="form-group"><label>🌍 Latitude (Garis Lintang)</label><input type="number" step="any" id="in-lat" placeholder="-1.6101"></div>
-          <div class="form-group"><label>🌏 Longitude (Garis Bujur)</label><input type="number" step="any" id="in-lng" placeholder="103.6131"></div>
+    <div id="panel">
+      <div id="map-box"><div id="mini-map"></div></div>
+      <div id="control-box">
+        <div class="row">
+          <input type="number" step="any" id="in-lat" class="inp" placeholder="Latitude (-2.99...)">
+          <input type="number" step="any" id="in-lng" class="inp" placeholder="Longitude (104.75...)">
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>🕒 Waktu Kegiatan</label><input type="datetime-local" id="in-time"></div>
-          <div class="form-group"><label>📝 Keterangan Kegiatan</label><input type="text" id="in-note" placeholder="Contoh: Koordinasi Dinas, Survey Lahan..."></div>
+        <div class="row">
+          <input type="datetime-local" id="in-time" class="inp">
+          <input type="text" id="in-note" class="inp" placeholder="Nama Kegiatan...">
         </div>
-        
-        <div class="btn-group">
-          <button class="btn-act btn-map" id="btn-map-mode" onclick="toggleMapMode()">📌 Klik Peta: OFF</button>
-          <button class="btn-act btn-add" onclick="addFromForm()">💾 Simpan Titik</button>
+        <div class="row">
+          <button class="btn btn-map" id="btn-map" onclick="toggleMap()">📌 Klik Peta: OFF</button>
+          <button class="btn btn-add" onclick="addFromForm()">💾 Tambah Titik</button>
         </div>
-
-        <ul id="loc-list"></ul>
-        
-        <div class="btn-group" style="margin-top: auto;">
-          <button class="btn-act btn-dl" onclick="downloadArchive()">📥 Unduh Arsip</button>
-          <button class="btn-act btn-rst" onclick="resetAll()">🔄 Reset</button>
+        <ul id="list"></ul>
+        <div class="row" style="margin-top: auto;">
+          <button class="btn btn-dl" onclick="downloadArchive()">📥 Unduh Arsip</button>
+          <button class="btn btn-rst" onclick="resetAll()">🔄 Reset</button>
         </div>
       </div>
     </div>
@@ -122,7 +111,7 @@
   <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
   <script>
     let map, markers = [], locations = [];
-    let isMapMode = false;
+    let mapMode = false;
     const $ = id => document.getElementById(id);
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -132,46 +121,44 @@
     });
 
     function handlePhoto(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+      const file = e.target.files[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = ev => {
         $('bg-photo').src = ev.target.result;
         $('upload-screen').classList.add('hidden');
-        $('app-container').classList.add('active');
-        setTimeout(() => initMap(), 100);
+        $('app').classList.add('active');
+        setTimeout(() => initMap(), 150); // Delay biar layout stabil
       };
       reader.readAsDataURL(file);
     }
 
     function initMap() {
+      if (map) map.remove();
       map = L.map('mini-map', { zoomControl: false }).setView([-1.6101, 103.6131], 11);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         crossOrigin: 'anonymous', attribution: '© OSM'
       }).addTo(map);
+      map.invalidateSize();
       
-      map.invalidateSize(); // PENTING: Memastikan peta ter-render
-      
-      map.on('click', function(e) {
+      map.on('click', e => {
         $('in-lat').value = e.latlng.lat.toFixed(6);
         $('in-lng').value = e.latlng.lng.toFixed(6);
-        if (isMapMode) { savePoint(e.latlng.lat, e.latlng.lng); toggleMapMode(); }
+        if (mapMode) { savePoint(e.latlng.lat, e.latlng.lng); toggleMap(); }
       });
-
       renderMarkers(); renderList();
     }
 
-    function toggleMapMode() {
-      isMapMode = !isMapMode;
-      $('btn-map-mode').textContent = isMapMode ? '✅ Klik Peta: ON' : '📌 Klik Peta: OFF';
-      $('btn-map-mode').classList.toggle('active', isMapMode);
-      map.getContainer().style.cursor = isMapMode ? 'crosshair' : 'default';
+    function toggleMap() {
+      mapMode = !mapMode;
+      $('btn-map').textContent = mapMode ? '✅ Klik Peta: ON' : '📌 Klik Peta: OFF';
+      $('btn-map').classList.toggle('on', mapMode);
+      map.getContainer().style.cursor = mapMode ? 'crosshair' : 'default';
     }
 
     function addFromForm() {
       const lat = parseFloat($('in-lat').value);
       const lng = parseFloat($('in-lng').value);
-      if (!lat || !lng) { alert('⚠️ Koordinat Latitude & Longitude wajib diisi!'); return; }
+      if (isNaN(lat) || isNaN(lng)) { alert('⚠️ Koordinat tidak valid!'); return; }
       savePoint(lat, lng);
     }
 
@@ -179,82 +166,91 @@
       const time = $('in-time').value || new Date().toISOString().slice(0, 16);
       const note = $('in-note').value.trim() || 'Tanpa keterangan';
       locations.push({ id: Date.now().toString(), lat, lng, time, note });
-      
       saveData(); renderMarkers(); renderList();
-      $('in-time').value = new Date().toISOString().slice(0, 16); // Reset waktu
-      map.flyTo([lat, lng], 13);
+      $('in-time').value = new Date().toISOString().slice(0, 16);
+      $('in-note').value = '';
+      map.flyTo([lat, lng], 14);
     }
 
     function renderMarkers() {
       markers.forEach(m => map.removeLayer(m)); markers = [];
       locations.forEach(loc => {
         const m = L.marker([loc.lat, loc.lng]).addTo(map);
-        m.bindPopup(`<b>${loc.time}</b><br>${loc.note}<br><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small>`);
+        m.bindPopup(`<b>${loc.time}</b><br>${loc.note}`);
         markers.push(m);
       });
     }
 
     function renderList() {
-      const list = $('loc-list'); list.innerHTML = '';
+      const list = $('list'); list.innerHTML = '';
       locations.slice().reverse().forEach(loc => {
         list.innerHTML += `
           <li class="loc-item">
-            <div class="loc-info">
-              <span class="loc-time">🕒 ${loc.time}</span>
-              <span class="loc-meta">📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</span>
-              <span class="loc-note">📝 ${loc.note}</span>
-            </div>
+            <div><div class="loc-meta">📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</div><div>${loc.note}</div></div>
             <div class="loc-acts">
-              <button onclick="focusLoc('${loc.id}')">🔍</button>
-              <button onclick="deleteLoc('${loc.id}')" style="color:#f87171;">🗑️</button>
+              <button onclick="focus('${loc.id}')">🔍</button>
+              <button onclick="del('${loc.id}')" style="color:#f87171">🗑️</button>
             </div>
           </li>`;
       });
     }
 
-    window.focusLoc = (id) => {
+    window.focus = id => {
       const idx = locations.findIndex(l => l.id === id);
-      if (idx !== -1 && markers[idx]) { map.flyTo([locations[idx].lat, locations[idx].lng], 15); markers[idx].openPopup(); }
+      if (idx > -1 && markers[idx]) map.flyTo([locations[idx].lat, locations[idx].lng], 15), markers[idx].openPopup();
     };
-
-    window.deleteLoc = (id) => {
-      if (!confirm('Hapus titik ini?')) return;
+    window.del = id => {
+      if (!confirm('Hapus?')) return;
       locations = locations.filter(l => l.id !== id);
       saveData(); renderMarkers(); renderList();
     };
 
-    function saveData() { try { localStorage.setItem('arsipData', JSON.stringify(locations)); } catch {} }
-    function loadData() { try { const d = localStorage.getItem('arsipData'); if (d) locations = JSON.parse(d); } catch {} }
-    
+    function saveData() { try { localStorage.setItem('mapData', JSON.stringify(locations)); } catch {} }
+    function loadData() { try { const d = localStorage.getItem('mapData'); if (d) locations = JSON.parse(d); } catch {} }
     window.resetAll = () => {
-      if (!confirm('Reset semua data & foto?')) return;
-      locations = []; markers = []; localStorage.removeItem('arsipData');
-      $('app-container').classList.remove('active'); $('upload-screen').classList.remove('hidden'); $('photo-input').value = '';
+      if (!confirm('Reset semua?')) return;
+      locations = []; markers = []; localStorage.removeItem('mapData');
+      $('app').classList.remove('active'); $('upload-screen').classList.remove('hidden'); $('photo-input').value = '';
       if (map) map.remove(); map = null;
     };
 
     async function downloadArchive() {
-      const container = $('app-container');
       const btn = document.querySelector('.btn-dl');
-      const hideEls = document.querySelectorAll('.btn-dl, .btn-rst, .btn-map-mode, .btn-add');
-      hideEls.forEach(el => { el.dataset.prev = el.style.display; el.style.display = 'none'; });
+      btn.textContent = '⏳ Memproses...'; btn.disabled = true;
 
-      btn.textContent = '⏳ Memproses...';
-      await new Promise(r => setTimeout(r, 300));
+      // 1. Siapkan tampilan bersih untuk export
+      const stamp = $('export-stamp');
+      const list = $('export-list');
+      list.innerHTML = '';
+      locations.forEach(loc => {
+        list.innerHTML += `<li><span>🕒 ${loc.time}</span><span>📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</span></li>`;
+      });
+
+      // Sembunyikan UI, munculkan stamp bersih
+      const hide = document.querySelectorAll('.btn, .row, .inp, #list');
+      hide.forEach(el => el.classList.add('hide-dl'));
+      stamp.style.display = 'block';
+      $('panel').style.background = 'transparent'; $('panel').style.border = 'none'; $('panel').style.padding = '8px';
+
+      await new Promise(r => setTimeout(r, 400));
 
       try {
-        const canvas = await html2canvas(container, {
+        // 2. Capture
+        const canvas = await html2canvas($('app'), {
           useCORS: true, allowTaint: true, scale: window.devicePixelRatio || 2,
-          backgroundColor: '#0f172a', logging: false
+          backgroundColor: '#0f172a', logging: false, windowWidth: window.innerWidth
         });
         canvas.toBlob(blob => {
           const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
           a.download = `arsip_${new Date().toISOString().slice(0,10)}.png`; a.click();
         });
-      } catch (e) { alert('⚠️ Gagal unduh. Pastikan tile peta sudah termuat.'); }
+      } catch (e) { alert('Gagal unduh. Tunggu peta termuat.'); }
       finally {
-        btn.textContent = '📥 Unduh Arsip';
-        hideEls.forEach(el => el.style.display = el.dataset.prev || '');
+        // 3. Kembalikan UI
+        stamp.style.display = 'none';
+        hide.forEach(el => el.classList.remove('hide-dl'));
+        $('panel').style.background = ''; $('panel').style.border = ''; $('panel').style.padding = '';
+        btn.textContent = '📥 Unduh Arsip'; btn.disabled = false;
       }
     }
   </script>
