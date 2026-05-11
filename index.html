@@ -55,7 +55,7 @@
     .controls button.btn-download { background: var(--primary); }
 
     /* Popup Form */
-    .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 8px; }
+    .leaflet-popup-content-wrapper { background: #1e293b; color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
     .leaflet-popup-content { margin: 8px 12px; }
     .popup-form label { display: block; margin: 5px 0 2px; font-size: 0.82rem; color: #cbd5e1; }
     .popup-form input { width: 100%; padding: 5px; border: 1px solid #475569; border-radius: 4px; background: #0f172a; color: white; font-size: 0.85rem; }
@@ -77,7 +77,7 @@
   <div id="upload-screen">
     <div class="upload-box">
       <h2>📷 Arsip Kegiatan Dinas</h2>
-      <p>Upload foto lokasi kegiatan. Peta & data akan muncul di overlay bawah.</p>
+      <p>Upload foto dokumentasi lokasi. Peta & data koordinat akan muncul di panel bawah.</p>
       <label class="btn-upload">
         Pilih Foto
         <input type="file" id="photo-input" accept="image/*">
@@ -107,172 +107,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script>
-    let map, markers = [], locations = [];
-    let isAdding = false;
-
-    const $ = id => document.getElementById(id);
-    const now = () => new Date().toISOString().slice(0, 16);
-
-    // 1. Inisialisasi
-    document.addEventListener('DOMContentLoaded', () => {
-      loadData();
-      $('photo-input').addEventListener('change', handlePhoto);
-      $('toggle-add').addEventListener('click', toggleAddMode);
-      $('btn-download').addEventListener('click', downloadArchive);
-      $('btn-reset').addEventListener('click', resetData);
-    });
-
-    function handlePhoto(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        $('bg-photo').src = ev.target.result;
-        $('upload-screen').classList.add('hidden');
-        $('archive-container').classList.add('active');
-        setTimeout(() => {
-          map = L.map('mini-map', { zoomControl: false }).setView([-1.6101, 103.6131], 11);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            crossOrigin: 'anonymous', attribution: '© OSM'
-          }).addTo(map);
-          map.invalidateSize();
-          map.on('click', handleMapClick);
-          renderMarkers();
-          renderList();
-        }, 100);
-      };
-      reader.readAsDataURL(file);
-    }
-
-    // 2. Tambah Marker
-    function toggleAddMode() {
-      isAdding = !isAdding;
-      $('toggle-add').classList.toggle('btn-active', isAdding);
-      map.getContainer().style.cursor = isAdding ? 'crosshair' : 'default';
-    }
-
-    function handleMapClick(e) {
-      if (!isAdding) return;
-      const content = `
-        <div class="popup-form">
-          <label>Waktu Kegiatan</label>
-          <input type="datetime-local" id="p-time" value="${now()}">
-          <label>Catatan / Nama Kegiatan</label>
-          <input type="text" id="p-note" placeholder="Contoh: Survey lapangan, rapat koordinasi...">
-          <div class="btn-group">
-            <button class="btn-save" onclick="savePoint(${e.latlng.lat}, ${e.latlng.lng})">💾 Simpan</button>
-            <button class="btn-cancel" onclick="map.closePopup()">Batal</button>
-          </div>
-        </div>
-      `;
-      L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
-    }
-
-    window.savePoint = (lat, lng) => {
-      const time = $('p-time').value || now();
-      const note = $('p-note').value.trim();
-      locations.push({ id: Date.now().toString(), lat, lng, time, note });
-      saveData();
-      renderMarkers();
-      renderList();
-      toggleAddMode();
-      map.closePopup();
-    };
-
-    function renderMarkers() {
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-      locations.forEach(loc => {
-        const m = L.marker([loc.lat, loc.lng]).addTo(map);
-        m.bindPopup(`<b>${loc.time}</b><br>${loc.note || 'Tanpa catatan'}<br><small>${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</small>`);
-        markers.push(m);
-      });
-      $('count-badge').textContent = `${locations.length} titik`;
-    }
-
-    function renderList() {
-      const list = $('loc-list');
-      list.innerHTML = '';
-      locations.slice().reverse().forEach(loc => {
-        const li = document.createElement('li');
-        li.className = 'loc-item';
-        li.innerHTML = `
-          <div>
-            <div class="loc-time">🕒 ${loc.time}</div>
-            <div class="loc-coords">📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</div>
-            <div class="loc-note">${loc.note || '-'}</div>
-          </div>
-          <div class="loc-actions">
-            <button onclick="focusLoc('${loc.id}')">🔍</button>
-            <button onclick="deleteLoc('${loc.id}')" style="color:#f87171;">🗑️</button>
-          </div>
-        `;
-        list.appendChild(li);
-      });
-    }
-
-    window.focusLoc = id => {
-      const idx = locations.findIndex(l => l.id === id);
-      if (idx !== -1) {
-        const loc = locations[idx];
-        map.flyTo([loc.lat, loc.lng], 14);
-        markers[idx].openPopup();
-      }
-    };
-
-    window.deleteLoc = id => {
-      if (!confirm('Hapus titik ini?')) return;
-      locations = locations.filter(l => l.id !== id);
-      saveData();
-      renderMarkers();
-      renderList();
-    };
-
-    // 3. Storage & Export
-    function saveData() {
-      try { localStorage.setItem('arsip_dinas_data', JSON.stringify(locations)); } catch {}
-    }
-    function loadData() {
-      try { const d = localStorage.getItem('arsip_dinas_data'); if (d) locations = JSON.parse(d); } catch {}
-    }
-    function resetData() {
-      if (!confirm('Hapus semua data & foto?')) return;
-      locations = []; markers = [];
-      localStorage.removeItem('arsip_dinas_data');
-      $('bg-photo').src = '';
-      $('archive-container').classList.remove('active');
-      $('upload-screen').classList.remove('hidden');
-      $('photo-input').value = '';
-      if (map) map.remove(); map = null;
-    }
-
-    async function downloadArchive() {
-      const btn = $('btn-download');
-      btn.textContent = '⏳ Menyiapkan...'; btn.disabled = true;
-      $('toggle-add').style.display = 'none'; $('btn-download').style.display = 'none'; $('btn-reset').style.display = 'none';
-
-      await new Promise(r => setTimeout(r, 300));
-      try {
-        const canvas = await html2canvas($('archive-container'), {
-          useCORS: true, allowTaint: true, scale: 2, backgroundColor: '#0f172a',
-          logging: false, windowWidth: window.innerWidth, windowHeight: window.innerHeight
-        });
-        canvas.toBlob(blob => {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `arsip_dinas_${new Date().toISOString().slice(0,10)}.png`;
-          a.click();
-          URL.revokeObjectURL(a.href);
-        }, 'image/png');
-      } catch (e) {
-        console.error(e);
-        alert('Gagal mengunduh. Pastikan tile peta sudah termuat penuh.');
-      } finally {
-        btn.textContent = '📥 Unduh Arsip'; btn.disabled = false;
-        $('toggle-add').style.display = ''; $('btn-download').style.display = ''; $('btn-reset').style.display = '';
-      }
-    }
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
