@@ -24,25 +24,24 @@ function handlePhoto(e) {
   reader.onload = ev => {
     const img = new Image();
     img.onload = () => {
-      // 1. Hitung rasio agar muat di layar browser
-      const maxH = window.innerHeight * 0.9; // Maks 90% tinggi layar
-      const scale = Math.min(1, maxH / img.naturalHeight);
+      // 1. Hitung skala agar muat di layar, TAPI pertahankan rasio asli
+      const maxW = window.innerWidth * 0.95;
+      const maxH = window.innerHeight * 0.85;
+      const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
       
       const w = Math.round(img.naturalWidth * scale);
       const h = Math.round(img.naturalHeight * scale);
-      const footerH = Math.round(h * 0.125); // Footer 1/8 tinggi foto
+      const footerH = Math.round(h * 0.125); // Footer tepat 1/8 tinggi foto
 
-      // 2. Terapkan ukuran ke container
+      // 2. KUNCI dimensi container secara eksplisit (pixel)
       const container = $('archive-container');
       container.style.width = `${w}px`;
-      container.style.height = `${h}px`;
-      
-      $('bg-photo').src = ev.target.result;
+      container.style.height = `${h + footerH}px`;
       $('bottom-panel').style.height = `${footerH}px`;
-      
+
+      $('bg-photo').src = ev.target.result;
       $('upload-screen').classList.add('hidden');
       container.classList.add('active');
-      
       initMap();
     };
     img.src = ev.target.result;
@@ -56,17 +55,15 @@ function initMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     crossOrigin: 'anonymous', attribution: 'OSM'
   }).addTo(map);
-  
   map.invalidateSize();
   map.on('click', handleMapClick);
-  renderMarkers();
-  renderList();
+  renderMarkers(); renderList();
 }
 
 function toggleAddMode() {
   isAdding = !isAdding;
   $('toggle-add').classList.toggle('btn-active', isAdding);
-  $('toggle-add').textContent = isAdding ? '✅ Klik Peta' : '📌 Tambah Titik';
+  $('toggle-add').textContent = isAdding ? '✅ Klik Peta' : '📌 Tambah';
   map.getContainer().style.cursor = isAdding ? 'crosshair' : 'default';
 }
 
@@ -106,7 +103,7 @@ function renderList() {
   locations.slice().reverse().forEach(loc => {
     list.innerHTML += `
       <li class="loc-item">
-        <div><div class="loc-time">${loc.time}</div><div class="loc-coords">${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</div><div class="loc-note">${loc.note}</div></div>
+        <div><div class="loc-coords">📍 ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</div><div class="loc-note">${loc.note}</div></div>
         <div class="loc-actions"><button class="btn-focus" data-id="${loc.id}">🔍</button><button class="btn-delete" data-id="${loc.id}">🗑️</button></div>
       </li>`;
   });
@@ -114,10 +111,7 @@ function renderList() {
 
 function focusLoc(id) {
   const idx = locations.findIndex(l => l.id === id);
-  if (idx > -1 && markers[idx]) {
-    map.flyTo([locations[idx].lat, locations[idx].lng], 14);
-    markers[idx].openPopup();
-  }
+  if (idx > -1 && markers[idx]) map.flyTo([locations[idx].lat, locations[idx].lng], 14), markers[idx].openPopup();
 }
 
 function deleteLoc(id) {
@@ -129,46 +123,45 @@ function deleteLoc(id) {
 function saveData() { try { localStorage.setItem('arsipData', JSON.stringify(locations)); } catch {} }
 function loadData() { try { const d = localStorage.getItem('arsipData'); if (d) locations = JSON.parse(d); } catch {} }
 function resetData() {
-  if (!confirm('Reset semua?')) return;
+  if (!confirm('Reset semua data & foto?')) return;
   locations = []; markers = []; localStorage.removeItem('arsipData');
   $('archive-container').classList.remove('active'); $('upload-screen').classList.remove('hidden'); $('photo-input').value = '';
   if(map) map.remove(); map = null;
 }
 
 async function downloadArchive() {
-  const btn = $('btn-download');
   const container = $('archive-container');
+  const btn = $('btn-download');
   
-  // Sembunyikan tombol & kontrol
-  const hide = ['.controls button', '.btn-delete', '.leaflet-control-zoom'];
-  hide.forEach(sel => {
-    const els = document.querySelectorAll(sel);
-    els.forEach(el => { el.style.display = 'none'; });
-  });
+  // 1. Sembunyikan UI yang tidak perlu di hasil gambar
+  const hideEls = document.querySelectorAll('.controls button, .btn-delete, .leaflet-control-zoom');
+  hideEls.forEach(el => { el.dataset.prevDisp = el.style.display; el.style.display = 'none'; });
 
-  btn.textContent = '⏳...';
+  btn.textContent = '⏳';
   await new Promise(r => setTimeout(r, 300));
 
   try {
-    // Capture container (yang ukurannya sudah pas dengan rasio foto)
+    // 2. Capture dengan dimensi EKSAK container (yang sudah dikunci rasionya)
     const canvas = await html2canvas(container, {
-      useCORS: true, allowTaint: true, scale: window.devicePixelRatio || 2, // Kualitas tinggi
-      backgroundColor: null, logging: false
+      width: container.offsetWidth,
+      height: container.offsetHeight,
+      scale: 2, // Kualitas tajam, TIDAK mengubah rasio
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#000',
+      logging: false
     });
     
     canvas.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      // Nama file mengikuti tanggal
       a.download = `arsip_${new Date().toISOString().slice(0,10)}.png`;
       a.click();
+      URL.revokeObjectURL(a.href);
     });
-  } catch (e) { alert('Gagal unduh. Tunggu peta termuat.'); }
+  } catch (e) { alert('Gagal unduh. Pastikan tile peta sudah termuat.'); }
   finally {
     btn.textContent = '📥 Unduh';
-    hide.forEach(sel => {
-      const els = document.querySelectorAll(sel);
-      els.forEach(el => { el.style.display = ''; });
-    });
+    hideEls.forEach(el => { el.style.display = el.dataset.prevDisp || ''; });
   }
 }
